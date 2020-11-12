@@ -1281,7 +1281,9 @@ def load_image_gt(dataset, config, image_id, augmentation=None):
         det = augmentation.to_deterministic()
         image = det.augment_image(image)
         # Change mask to np.uint8 because imgaug doesn't support np.bool
-        mask = det.augment_image(mask.astype(np.uint8),
+        ###### Fixed below line
+        # https://github.com/matterport/Mask_RCNN/issues/2018
+        mask = det.augment_images(mask.astype(np.uint8),
                                  hooks=imgaug.HooksImages(activator=hook))
         # Verify that shapes didn't change
         assert image.shape == image_shape, "Augmentation shouldn't change image size"
@@ -2373,6 +2375,7 @@ class MaskRCNN(object):
             max_queue_size=100,
             workers=workers,
             use_multiprocessing=workers > 1,
+            verbose=2,
         )
         self.epoch = max(self.epoch, epochs)
 

@@ -112,7 +112,8 @@ class MalariaDataset(utils.Dataset):
                 img_path = img['image']['pathname']
                 img_id = self.get_image_id_from_pathname_entry_in_json(img_path)
                 # NOTE: Need to adjust image path so that it doesn't have a leading "/" (otherwise os.path.join will be confused)
-                print("ADD IMAGE", img_id, img_path)
+                if False:
+                    print("ADD IMAGE", img_id, img_path)
                 self.add_image('malaria', image_id = img_id, path = os.path.join(dataset_dir, img_path[1:]))
 
     # X DONE
@@ -120,7 +121,8 @@ class MalariaDataset(utils.Dataset):
         """Load image.
         """
         image_id = self.image_info[image_idx]['id']
-        print("LOAD IMAGE: ", image_id)
+        if False:
+            print("LOAD IMAGE: ", image_id)
         return super().load_image(image_idx)
 
     # DONE
@@ -138,7 +140,8 @@ class MalariaDataset(utils.Dataset):
         for img in self.images:
             # If found the right Image in the JSON file...
             if image_id == self.get_image_id_from_pathname_entry_in_json(img['image']['pathname']):
-                print("FOUND MASK FOR: ", image_id)
+                if False:
+                    print("FOUND MASK FOR: ", image_id)
                 img_contents = skimage.io.imread(os.path.join(self.dataset_dir, img['image']['pathname'][1:])) # NOTE: Need to get rid of leading slash
                 # For each bounding box in 'objects'....
                 masks = np.zeros((img_contents.shape[0], img_contents.shape[1], len(img['objects'])))
@@ -149,7 +152,6 @@ class MalariaDataset(utils.Dataset):
                     masks[min_y:max_y, min_x:max_x, o_idx] = 1
                     class_ids.append(self.CLASSES[label])
                 break
-        print("MASKS SHAPE FOR " + image_id + ": ", masks.shape, class_ids)
         return masks, np.array(class_ids)
 
     # DONE
