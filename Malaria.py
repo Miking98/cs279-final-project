@@ -1,3 +1,9 @@
+import os, json
+from mrcnn import utils
+from mrcnn.config import Config
+import numpy as np
+import skimage.io
+
 class MalariaConfig(Config):
     """
     Derives from the base Config class and overrides values specific
@@ -8,8 +14,8 @@ class MalariaConfig(Config):
 
     # Train on 1 GPU and 8 images per GPU. We can put multiple images on each
     # GPU because the images are small. Batch size is 8 (GPUs * images/GPU).
-    GPU_COUNT = 0
-    IMAGES_PER_GPU = 8
+    GPU_COUNT = 1
+    IMAGES_PER_GPU = 2
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 7
@@ -70,8 +76,7 @@ class MalariaInferenceConfig(MalariaConfig):
     RPN_NMS_THRESHOLD = 0.7
 
 class MalariaDataset(utils.Dataset):
-
-    CLASSES = [
+    CLASSES = {
         'red blood cell' : 1, 
         'trophozoite' : 2,
         'ring' : 3,
@@ -79,63 +84,78 @@ class MalariaDataset(utils.Dataset):
         'leukocyte' : 5,
         'gametocyte' : 6,
         'difficult' : 7,
-    ]
-    def load_dataset(self, dataset_dir, subset = 'train'):
+    }
+
+    def get_image_id_from_pathname_entry_in_json(self, pathname):
+        return pathname[len("/images/") : -4]
+
+    # X DONE
+    def load_dataset(self, dataset_dir, is_train = False, is_val = False):
         """Load the Malaria dataset.
         dataset_dir: Root directory of the dataset (no trailing slash)
-        subset: 'train' or 'test' or 'validation'
         """
+        self.dataset_dir = dataset_dir
+        self.is_train = is_train
         # Add classes
-        for class_name in CLASSES.keys():
-            self.add_class('malaria', class_name, CLASSES[class_name])
+        for class_name in self.CLASSES.keys():
+            self.add_class('malaria', self.CLASSES[class_name], class_name)
         # Add data
-        file_name = "/training.json"
-        if subset == "test":
-            file_name = "/testing.json"
-        elif subset == "val":
-            file_name = "/validation.json"
-        with open(dataset_dir + file_name) as json_file:
-            images = json.load(json_file)
-            for img in images:
+        file_name = "training.json" if is_train else 'test.json'
+        with open(os.path.join(dataset_dir, file_name)) as json_file:
+            self.images = json.load(json_file)
+            for img_idx, img in enumerate(self.images):
+                # If train, skip every 10th image
+                if is_train and img_idx % 10 == 0: continue
+                # If validation, only keep every 10th image
+                if is_val and img_idx % 10 != 0: continue
                 # Read the image
                 img_path = img['image']['pathname']
-                img_id = img_path[len("/images/") : -4]
-                self.add_image('malaria', image_id = img_id, path = os.path.join(dataset_dir, img_path))
+                img_id = self.get_image_id_from_pathname_entry_in_json(img_path)
+                # NOTE: Need to adjust image path so that it doesn't have a leading "/" (otherwise os.path.join will be confused)
+                print("ADD IMAGE", img_id, img_path)
+                self.add_image('malaria', image_id = img_id, path = os.path.join(dataset_dir, img_path[1:]))
 
-    def load_image(self, image_id):
+    # X DONE
+    def load_image(self, image_idx):
         """Load image.
-       Returns:
-        masks: A bool array of shape [height, width, instance count] with
-            one mask per instance.
-        class_ids: a 1D array of class IDs of the instance masks.
         """
-        return super().load_image(image_id)
+        image_id = self.image_info[image_idx]['id']
+        print("LOAD IMAGE: ", image_id)
+        return super().load_image(image_idx)
 
-    def load_mask(self, image_id):
+    # DONE
+    def load_mask(self, image_idx):
         """Generate instance masks for an image.
        Returns:
         masks: A bool array of shape [height, width, instance count] with
             one mask per instance.
         class_ids: a 1D array of class IDs of the instance masks.
         """
-        info = self.image_info[image_id]
-        # Get mask directory from image path
-        mask_dir = os.path.join(os.path.dirname(os.path.dirname(info['path'])), "masks")
+        image_id = self.image_info[image_idx]['id']
+        masks = None
+        class_ids = []
+        # Construct masks from bounding boxes
+        for img in self.images:
+            # If found the right Image in the JSON file...
+            if image_id == self.get_image_id_from_pathname_entry_in_json(img['image']['pathname']):
+                print("FOUND MASK FOR: ", image_id)
+                img_contents = skimage.io.imread(os.path.join(self.dataset_dir, img['image']['pathname'][1:])) # NOTE: Need to get rid of leading slash
+                # For each bounding box in 'objects'....
+                masks = np.zeros((img_contents.shape[0], img_contents.shape[1], len(img['objects'])))
+                for o_idx, o in enumerate(img['objects']):
+                    label = o['category']
+                    min_y, min_x = o['bounding_box']['minimum']['r'], o['bounding_box']['minimum']['c']
+                    max_y, max_x = o['bounding_box']['maximum']['r'], o['bounding_box']['maximum']['c']
+                    masks[min_y:max_y, min_x:max_x, o_idx] = 1
+                    class_ids.append(self.CLASSES[label])
+                break
+        print("MASKS SHAPE FOR " + image_id + ": ", masks.shape, class_ids)
+        return masks, np.array(class_ids)
 
-        # Read mask files from .png image
-        mask = []
-        for f in next(os.walk(mask_dir))[2]:
-            if f.endswith(".png"):
-                m = skimage.io.imread(os.path.join(mask_dir, f)).astype(np.bool)
-                mask.append(m)
-        mask = np.stack(mask, axis=-1)
-        # Return mask, and array of class IDs of each instance. Since we have
-        # one class ID, we return an array of ones
-        return mask, np.ones([mask.shape[-1]], dtype=np.int32)
-
-    def image_reference(self, image_id):
+    # DONE
+    def image_reference(self, image_idx):
         """Return the path of the image."""
-        info = self.image_info[image_id]
+        info = self.image_info[image_idx]
         if info["source"] == "malaria":
             return info["path"]
         else:
