@@ -44,7 +44,7 @@ class MalariaConfig(Config):
     TRAIN_ROIS_PER_IMAGE = 32
 
     # Use a small epoch since the data is simple
-    STEPS_PER_EPOCH = 100
+    STEPS_PER_EPOCH = 10
 
     # use small validation steps since the epoch is small
     VALIDATION_STEPS = 5
@@ -90,7 +90,7 @@ class MalariaDataset(utils.Dataset):
         return pathname[len("/images/") : -4]
 
     # X DONE
-    def load_dataset(self, dataset_dir, is_train = False, is_val = False):
+    def load_dataset(self, dataset_dir, is_train = False, is_val = False, is_test = False):
         """Load the Malaria dataset.
         dataset_dir: Root directory of the dataset (no trailing slash)
         """
@@ -100,7 +100,7 @@ class MalariaDataset(utils.Dataset):
         for class_name in self.CLASSES.keys():
             self.add_class('malaria', self.CLASSES[class_name], class_name)
         # Add data
-        file_name = "training.json" if is_train else 'test.json'
+        file_name = "training.json" if is_train or is_val else 'test.json'
         with open(os.path.join(dataset_dir, file_name)) as json_file:
             self.images = json.load(json_file)
             for img_idx, img in enumerate(self.images):

@@ -6,6 +6,7 @@ import json
 import matplotlib.patches as patches
 from imgaug import augmenters as iaa
 import os
+import datetime
 
 # Mask R-CNN
 from mrcnn import utils
@@ -98,6 +99,38 @@ def display_training_set():
             # show the image
             plt.show()
 
+
+def inference(model, dataset_dir):
+    """Run inference on images in the given directory."""
+    print("Running on {}".format(dataset_dir))
+
+    # Create directory
+    if not os.path.exists(RESULTS_DIR):
+        os.makedirs(RESULTS_DIR)
+    submit_dir = "submit_{:%Y%m%dT%H%M%S}".format(datetime.datetime.now())
+    submit_dir = os.path.join(RESULTS_DIR, submit_dir)
+    os.makedirs(submit_dir)
+
+    # Read dataset
+    dataset = MalariaDataset()
+    dataset.load_dataset(dataset_dir, is_test = True)
+    dataset.prepare()
+    # Load over images
+    submission = []
+    for image_id in dataset.image_ids:
+        # Load image and run inference
+        image = dataset.load_image(image_id)
+        # Detect objects
+        r = model.detect([image], verbose=0)[0]
+        # Save image with masks
+        visualize.display_instances(
+            image, r['rois'], r['masks'], r['class_ids'],
+            dataset.class_names, r['scores'],
+            show_bbox=True, show_mask=False,
+            title="Predictions")
+        plt.savefig("{}/{}.png".format(submit_dir, dataset.image_info[image_id]["id"]))
+    print("---- DONE DETECTING ----")
+
 def train(model, dataset_dir):
     # References:
     #    https://medium.com/analytics-vidhya/deep-learning-computer-vision-object-detection-infection-classification-on-malaria-images-3769b4f51de9
@@ -132,7 +165,7 @@ def train(model, dataset_dir):
     print("Train network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=20,
+                epochs=1, # Usually 20
                 augmentation=augmentation,
                 layers='heads',
                 use_multiprocessing = False)
@@ -140,7 +173,7 @@ def train(model, dataset_dir):
     print("Train all layers")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=40,
+                epochs=1 * 2,
                 augmentation=augmentation,
                 layers='all',
                 use_multiprocessing = False)
@@ -152,8 +185,10 @@ if __name__ == '__main__':
     import argparse
 
     '''
-    HOW TO RUN: 
+    TRAIN:
         python3 project.py train --dataset /Users/mwornow/Desktop/data --weights coco
+    TEST:
+        python3 project.py inference --dataset /users/mwornow/desktop/data --weights /Users/mwornow/Dropbox/Stanford/Classes/CS\ 279\ \(Structure\ of\ Biomolecules\ and\ Cells\)/Project/logs/malaria20201112T1519/mask_rcnn_malaria_0002.h5
     '''
 
     # Parse command line arguments
