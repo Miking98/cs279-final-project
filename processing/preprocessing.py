@@ -1,6 +1,6 @@
 import timeit
 import numpy as np
-from skimage import io, draw, color, exposure, measure, filters
+from skimage import io, draw, color, exposure
 from skimage import morphology as morph
 from sklearn.cluster import KMeans
 from scipy.ndimage import morphology
@@ -32,17 +32,20 @@ def find_background(image, morph_filters=True):
 
     # find background through a threshold saturation level
     # apply k-means to cluster the saturation values into two groups (foreground and background)
-    saturation_values = hsv_img[:, :, 1].flatten().reshape(-1, 1)
-    k_means = KMeans(n_clusters=2).fit(saturation_values)
-    threshold_saturation = (k_means.cluster_centers_[0][0] + k_means.cluster_centers_[1][0]) / 2
-    background_mask = hsv_img[:, :, 1] < threshold_saturation
+    S = hsv_img[:, :, 1].flatten()
+    V = hsv_img[:, :, 2].flatten()
+    data = np.stack((S, V), axis=1)
+    mask = KMeans(n_clusters=2).fit_predict(data)
+    mask = mask.reshape(image.shape[0:2])
+    if np.average(hsv_img[mask == 1, 2]) > np.average(
+            hsv_img[mask == 0, 2]):  # ensure foreground is index 1
+        mask = 1 - mask
     if morph_filters:
-        mask = np.ones_like(background_mask)
-        mask[background_mask] = 0
+        mask = mask
         mask = morph.binary_closing(mask, selem=morph.disk(30))
         mask = morph.binary_dilation(mask, selem=morph.disk(5))
         mask = morph.binary_opening(mask, selem=morph.disk(30))
-        background_mask = mask < 0.5
+    background_mask = mask == 0
     return background_mask
 
 
@@ -67,13 +70,14 @@ def apply_color_correction(image, background_mask):
     hsv_img = color.rgb2hsv(image)
 
     # move average foreground hue value to purple = 0.65
-    avg_foreground_hue = np.average(hsv_img[~background_mask, 0])
+    avg_foreground_hue = np.average(hsv_img[~background_mask, 0],
+                                    weights=hsv_img[~background_mask, 1])
     hsv_img[:, :, 0] += -avg_foreground_hue + 0.65
     hsv_img[hsv_img[:, :, 0] < 0, 0] += 1
     hsv_img[hsv_img[:, :, 0] > 1, 0] -= 1
     image = color.hsv2rgb(hsv_img)
 
-    # correct brightness
+    # correct brightness (value)
     # https://scikit-image.org/docs/dev/api/skimage.exposure.html#skimage.exposure.equalize_hist
     image = exposure.equalize_hist(image, mask=~background_mask)
 
@@ -128,7 +132,7 @@ def demo(path_to_data):
         for file in files:
             # read the image
             file_path = file['image']['pathname']
-            fig.suptitle(file_path+"\nclick on plot to see next image")
+            fig.suptitle(file_path + "\nclick on plot to see next image")
             print(f"processing file: {file_path}")
             start_time = timeit.default_timer()
             image = io.imread(path_to_data + file_path)
