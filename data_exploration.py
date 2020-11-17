@@ -11,9 +11,7 @@ plt.style.use('seaborn')
 
 '''
 
-- Histogram of number of cell clusters in image
 - Average number of cells that each class type overlaps with
-- Histogram of the number of cells in a cell cluster
 
 '''
 
@@ -99,16 +97,33 @@ def display_image(image_ids = None):
             # show the image
             plt.show()
 
+def is_point_in_box(point, box):
+    y, x = point
+    miny, minx, maxy, maxx = box
+    if y >= miny and y <= maxy and x >= minx and x <= maxx:
+        return True
+    return False    
+def is_overlap(box1, box2):
+    miny, minx, maxy, maxx = box1
+    if is_point_in_box((miny, minx), box2) or is_point_in_box((maxy, maxx), box2):
+        return True
+    return False
+
 def explore_data():
     with open("/Users/mwornow/desktop/data/training.json") as json_file:
         files = json.load(json_file)
         class_counts = { key : 0 for key in CATEGORY_COLORS.keys() }
         n_cells_in_image = []
         cell_location_counter = np.zeros((1000,1000))
+        n_clusters = [] # Number of clusters in each image
+        n_clusters_2 = [] # Number of clusters in each image (with size >= 2)
+        n_cluster_sizes = [] # Number of cells in each cluster
+        n_cluster_sizes_2 = [] # Number of cells in each cluster (with size >= 2)
         for file in files:
             # Read the image
             img_objects = file['objects']
             total_y, total_x = file['image']['shape']['r'], file['image']['shape']['c']
+            clusters = [] # Array of arrays
             for o in img_objects:
                 label = o['category']
                 min_y, min_x = o['bounding_box']['minimum']['r'], o['bounding_box']['minimum']['c']
@@ -119,7 +134,22 @@ def explore_data():
                 min_scale_x  = int(min_x/total_x * 1000) 
                 max_scale_x = int(max_x/total_x * 1000)
                 cell_location_counter[ min_scale_y : max_scale_y, min_scale_x : max_scale_x] = cell_location_counter[min_scale_y : max_scale_y, min_scale_x : max_scale_x] + 1
-                # print(np.sum(cell_location_counter), cell_location_counter[ min_scale_y : max_scale_y, min_scale_x : max_scale_x].shape, np.sum(cell_location_counter[ min_scale_y : max_scale_y, min_scale_x : max_scale_x]))
+                # Add it to a cluster if relevant
+                is_existing_cluster = False
+                box = (min_y, min_x, max_y, max_x)
+                for c in clusters:
+                    if is_existing_cluster: break
+                    for b in c:
+                        if is_overlap(b, box):
+                            c.append(box)
+                            is_existing_cluster = True
+                            break
+                if not is_existing_cluster:
+                    clusters.append([box])
+            n_clusters.append(len(clusters))
+            n_clusters_2.append(len([ c for c in clusters if len(c) > 1]))
+            n_cluster_sizes += [ len(c) for c in clusters  ]
+            n_cluster_sizes_2 += [ len(c) for c in clusters if len(c) > 1  ]
             n_cells_in_image.append(len(img_objects))
         if False:
             # Plot bar chart of class densities
@@ -143,9 +173,30 @@ def explore_data():
             plt.ylabel("Height")
             plt.colorbar(heatmap)
             plt.show()
-        if True:
+        if False:
+            # Plot histogram of number of clusters in each image
+            plt.hist(n_clusters, density = True, bins = 30)
+            plt.title("Distribution of Number of Cell Clusters (of Size >= 1 Cells) in Each Image")
+            plt.ylabel("Frequency")
+            plt.xlabel("Number of Cell Clusters in Image")
+            plt.show()
+            plt.hist(n_clusters_2, density = True, bins = 30)
+            plt.title("Distribution of Number of Cell Clusters (of Size >= 2 Cells) in Each Image")
+            plt.ylabel("Frequency")
+            plt.xlabel("Number of Cell Clusters in Image")
+            plt.show()
+        if False:
             # Plot histogram of number of cells in each cluster
-            pass
+            plt.hist(n_cluster_sizes, density = True, bins = 20)
+            plt.title("Distribution of Number of Cells in Each Cell Cluster (of Size >= 1 Cells)")
+            plt.ylabel("Frequency")
+            plt.xlabel("Number of Cells in Cell Cluster")
+            plt.show()
+            plt.hist(n_cluster_sizes_2, density = True, bins = 20)
+            plt.title("Distribution of Number of Cells in Each Cell Cluster (of Size >= 2 Cells)")
+            plt.ylabel("Frequency")
+            plt.xlabel("Number of Cells in Cell Cluster")
+            plt.show()
             
 # display_image(['5f491efd-a21c-4a80-aaba-70b8876238ac'])
 explore_data()
