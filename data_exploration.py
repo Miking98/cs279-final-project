@@ -9,6 +9,14 @@ import os
 plt.style.use('seaborn')
 
 
+'''
+
+- Histogram of number of cell clusters in image
+- Average number of cells that each class type overlaps with
+- Histogram of the number of cells in a cell cluster
+
+'''
+
 # For labeling boundary boxes in plots
 CATEGORY_COLORS = { 
     'red blood cell' : 'red', 
@@ -96,29 +104,48 @@ def explore_data():
         files = json.load(json_file)
         class_counts = { key : 0 for key in CATEGORY_COLORS.keys() }
         n_cells_in_image = []
+        cell_location_counter = np.zeros((1000,1000))
         for file in files:
             # Read the image
             img_objects = file['objects']
+            total_y, total_x = file['image']['shape']['r'], file['image']['shape']['c']
             for o in img_objects:
                 label = o['category']
                 min_y, min_x = o['bounding_box']['minimum']['r'], o['bounding_box']['minimum']['c']
                 max_y, max_x = o['bounding_box']['maximum']['r'], o['bounding_box']['maximum']['c']
                 class_counts[label] += 1
+                min_scale_y = int(min_y/total_y * 1000)
+                max_scale_y = int(max_y/total_y * 1000)
+                min_scale_x  = int(min_x/total_x * 1000) 
+                max_scale_x = int(max_x/total_x * 1000)
+                cell_location_counter[ min_scale_y : max_scale_y, min_scale_x : max_scale_x] = cell_location_counter[min_scale_y : max_scale_y, min_scale_x : max_scale_x] + 1
+                # print(np.sum(cell_location_counter), cell_location_counter[ min_scale_y : max_scale_y, min_scale_x : max_scale_x].shape, np.sum(cell_location_counter[ min_scale_y : max_scale_y, min_scale_x : max_scale_x]))
             n_cells_in_image.append(len(img_objects))
-        # Plot bar chart of class densities
-        total_class_count = sum([ x for x in class_counts.values() ])
-        plt.bar(class_counts.keys(), [ c / total_class_count for c in class_counts.values() ], tick_label = list(class_counts.keys()))
-        plt.title("Distribution of Cell Classes")
-        plt.ylabel("Frequency")
-        plt.show()
-        # Plot histogram of # of cells in each image
-        plt.hist(n_cells_in_image, density = True, bins = 30)
-        plt.title("Distribution of Number of Cells in Images")
-        plt.ylabel("Frequency")
-        plt.xlabel("Number of Cells in Image")
-        plt.show()
-        print(np.mean(n_cells_in_image), np.std(n_cells_in_image), np.amin(n_cells_in_image), np.amax(n_cells_in_image))
-        a = np.array(n_cells_in_image)
-        print(np.sum(a < 101))
-
-display_image(['5f491efd-a21c-4a80-aaba-70b8876238ac'])
+        if False:
+            # Plot bar chart of class densities
+            total_class_count = sum([ x for x in class_counts.values() ])
+            plt.bar(class_counts.keys(), [ c / total_class_count for c in class_counts.values() ], tick_label = list(class_counts.keys()))
+            plt.title("Distribution of Cell Classes")
+            plt.ylabel("Frequency")
+            plt.show()
+        if False:
+            # Plot histogram of # of cells in each image
+            plt.hist(n_cells_in_image, density = True, bins = 30)
+            plt.title("Distribution of Number of Cells in Images")
+            plt.ylabel("Frequency")
+            plt.xlabel("Number of Cells in Image")
+            plt.show()
+        if False:
+            # Plot heatmap of cell locations in images
+            heatmap = plt.imshow(cell_location_counter, cmap='hot', interpolation = None)
+            plt.title("Heatmap of Cell Locations in Images")
+            plt.xlabel("Width")
+            plt.ylabel("Height")
+            plt.colorbar(heatmap)
+            plt.show()
+        if True:
+            # Plot histogram of number of cells in each cluster
+            pass
+            
+# display_image(['5f491efd-a21c-4a80-aaba-70b8876238ac'])
+explore_data()

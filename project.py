@@ -165,7 +165,7 @@ def train(model, dataset_dir):
     print("Train network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=1, # Usually 20
+                epochs=20, # Usually 20
                 augmentation=augmentation,
                 layers='heads',
                 use_multiprocessing = False)
@@ -173,7 +173,7 @@ def train(model, dataset_dir):
     print("Train all layers")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=1 * 2,
+                epochs=40,
                 augmentation=augmentation,
                 layers='all',
                 use_multiprocessing = False)
@@ -188,7 +188,7 @@ if __name__ == '__main__':
     TRAIN:
         python3 project.py train --dataset /Users/mwornow/Desktop/data --weights coco
     TEST:
-        python3 project.py inference --dataset /users/mwornow/desktop/data --weights /Users/mwornow/Dropbox/Stanford/Classes/CS\ 279\ \(Structure\ of\ Biomolecules\ and\ Cells\)/Project/logs/malaria20201112T1519/mask_rcnn_malaria_0002.h5
+        
     '''
 
     # Parse command line arguments
