@@ -88,7 +88,6 @@ def train(model, dataset_dir):
     dataset_val.prepare()
 
     dataset_val.load_mask(0, visualization = True)
-    exit()
     # If starting from imagenet, train heads only for a bit
     # since they have random weights
     print("Train network heads")
