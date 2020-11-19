@@ -2,3 +2,4 @@ mask_rcnn_coco.h5
 logs/*
 /venv/
 /.idea
+myvenv/*
