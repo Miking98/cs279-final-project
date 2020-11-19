@@ -1,6 +1,6 @@
 import os, json
-from mrcnn import utils
-from mrcnn.config import Config
+from Mask_RCNN.mrcnn import utils
+from Mask_RCNN.mrcnn.config import Config
 import numpy as np
 import skimage.io
 

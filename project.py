@@ -9,9 +9,9 @@ import os
 import datetime
 
 # Mask R-CNN
-from mrcnn import utils
-import mrcnn.model as modellib
-from mrcnn import visualize
+from Mask_RCNN.mrcnn import utils
+import Mask_RCNN.mrcnn.model as modellib
+from Mask_RCNN.mrcnn import visualize
 
 # Malaria Dataset
 from Malaria import MalariaDataset, MalariaConfig, MalariaInferenceConfig
