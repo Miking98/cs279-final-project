@@ -40,66 +40,6 @@ CATEGORY_COLORS = {
     'difficult' : 'brown',
 }
 
-def remove_background(image):
-    image = image.copy()
-    # Convert to HSV
-    #   https://en.wikipedia.org/wiki/HSL_and_HSV#/media/File:HSV_color_solid_cylinder_saturation_gray.png
-    hsv_img = color.rgb2hsv(image)
-    # Set V (=value) to 1.0, i.e. remove all darkness
-    hsv_img[:, :, 2] = 1.0
-    # Attempt to remove background pixels by removing pixels with S (=saturation) below a certain level
-    median_saturation = np.median(hsv_img[:, :, 1])
-    image[hsv_img[:, :, 1] < median_saturation * 3] = [255, 0, 0]
-    return image
-
-def display_training_set():
-    with open("/Users/mwornow/desktop/data/training.json") as json_file:
-        files = json.load(json_file)
-        for file in files:
-            # Read the image
-            file_path = file['image']['pathname']
-            # file_path = '/images/ffd59802-46c6-4b58-80fe-e534e39781a7.png'
-            image = io.imread("/Users/mwornow/desktop/data" + file_path)
-
-            # Set up plots
-            f, ax = plt.subplots(2,2)
-            f.suptitle("Image: " + file_path + " | Size: " + str(image.shape))
-
-            # PLOT (0,0) => Show original image
-            ax[0,0].set_title('Original')
-            ax[0,0].imshow(image)
-
-            # PLOT (0,1) => Show background highlighted
-            ax[0,1].set_title('Background removed')
-            ax[0,1].imshow(remove_background(image))
-
-            # code for drawing bounding boxes
-            types_in_image = set()
-            boxes = []
-            for obj in file['objects']:
-                category = obj['category']
-                bounding_box = obj['bounding_box']
-                minimum = bounding_box['minimum']
-                maximum = bounding_box['maximum']
-                # start = (minimum['r'], minimum['c'])
-                # stop = (maximum['r'], maximum['c'])
-                # rr, cc = draw.rectangle_perimeter(start=start, end=stop)
-                # image[rr, cc] = [0,0,0] if obj['category'] == 'red blood cell' else [0, 255, 0]
-                start = (minimum['c'], minimum['r'])
-                height = maximum['r'] - minimum['r']
-                width = maximum['c'] - minimum['c']
-                boxes += [ patches.Rectangle(start, width, height, linewidth = 1, edgecolor = CATEGORY_COLORS[category], facecolor = CATEGORY_COLORS[category], alpha = 0.2) ]
-                types_in_image.add(obj['category'])
-            
-            # PLOT (1,0) => Show boundary boxes
-            ax[1,0].set_title('Boundary boxes')
-            ax[1,0].imshow(image)
-            for p in boxes:
-                ax[1,0].add_patch(p)
-            # show the image
-            plt.show()
-
-
 def inference(model, dataset_dir):
     """Run inference on images in the given directory."""
     print("Running on {}".format(dataset_dir))
@@ -146,35 +86,19 @@ def train(model, dataset_dir):
     dataset_val = MalariaDataset()
     dataset_val.load_dataset(dataset_dir, is_val = True)
     dataset_val.prepare()
-
-    # Image augmentation
-    # http://imgaug.readthedocs.io/en/latest/source/augmenters.html
-    augmentation = iaa.SomeOf((0, 2), [
-        iaa.Fliplr(0.5),
-        iaa.Flipud(0.5),
-        iaa.OneOf([iaa.Affine(rotate=90),
-                   iaa.Affine(rotate=180),
-                   iaa.Affine(rotate=270)]),
-        iaa.Multiply((0.8, 1.5)),
-        iaa.GaussianBlur(sigma=(0.0, 5.0))
-    ])
-
-
     # If starting from imagenet, train heads only for a bit
     # since they have random weights
     print("Train network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=4, # Usually 20
-                augmentation=augmentation,
+                epochs=10, # Usually 20
                 layers='heads',
                 use_multiprocessing = False)
 
     print("Train all layers")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=8,
-                augmentation=augmentation,
+                epochs=25,
                 layers='all',
                 use_multiprocessing = False)
 

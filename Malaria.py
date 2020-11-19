@@ -22,8 +22,8 @@ class MalariaConfig(Config):
 
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
-    IMAGE_MIN_DIM = 128
-    IMAGE_MAX_DIM = 128
+    IMAGE_MIN_DIM = 512
+    IMAGE_MAX_DIM = 512
 
     # Use smaller anchors because our image and objects are small
     RPN_ANCHOR_SCALES = (8, 16, 32, 64, 128)  # anchor size in pixels
@@ -44,7 +44,7 @@ class MalariaConfig(Config):
     TRAIN_ROIS_PER_IMAGE = 32
 
     # Use a small epoch since the data is simple
-    STEPS_PER_EPOCH = 100
+    STEPS_PER_EPOCH = 500
 
     # use small validation steps since the epoch is small
     VALIDATION_STEPS = 5
@@ -89,7 +89,6 @@ class MalariaDataset(utils.Dataset):
     def get_image_id_from_pathname_entry_in_json(self, pathname):
         return pathname[len("/images/") : -4]
 
-    # X DONE
     def load_dataset(self, dataset_dir, is_train = False, is_val = False, is_test = False):
         """Load the Malaria dataset.
         dataset_dir: Root directory of the dataset (no trailing slash)
@@ -116,7 +115,6 @@ class MalariaDataset(utils.Dataset):
                     print("ADD IMAGE", img_id, img_path)
                 self.add_image('malaria', image_id = img_id, path = os.path.join(dataset_dir, img_path[1:]))
 
-    # X DONE
     def load_image(self, image_idx):
         """Load image.
         """
@@ -125,7 +123,6 @@ class MalariaDataset(utils.Dataset):
             print("LOAD IMAGE: ", image_id)
         return super().load_image(image_idx)
 
-    # DONE
     def load_mask(self, image_idx):
         """Generate instance masks for an image.
        Returns:
@@ -140,10 +137,11 @@ class MalariaDataset(utils.Dataset):
         for img in self.images:
             # If found the right Image in the JSON file...
             if image_id == self.get_image_id_from_pathname_entry_in_json(img['image']['pathname']):
-                if False:
+                if 1:
                     print("FOUND MASK FOR: ", image_id)
                 img_contents = skimage.io.imread(os.path.join(self.dataset_dir, img['image']['pathname'][1:])) # NOTE: Need to get rid of leading slash
                 # For each bounding box in 'objects'....
+                print(img_contents.shape, len(img['objects']), img['image'])
                 masks = np.zeros((img_contents.shape[0], img_contents.shape[1], len(img['objects'])))
                 for o_idx, o in enumerate(img['objects']):
                     label = o['category']
@@ -152,9 +150,10 @@ class MalariaDataset(utils.Dataset):
                     masks[min_y:max_y, min_x:max_x, o_idx] = 1
                     class_ids.append(self.CLASSES[label])
                 break
+        print(masks.shape, class_ids)
+        exit()
         return masks, np.array(class_ids)
 
-    # DONE
     def image_reference(self, image_idx):
         """Return the path of the image."""
         info = self.image_info[image_idx]
