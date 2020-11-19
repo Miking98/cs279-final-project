@@ -30,28 +30,28 @@ class MalariaConfig(Config):
     MAX_GT_INSTANCES = 200
 
     # Use smaller anchors because our image and objects are small
-    RPN_ANCHOR_SCALES = (8, 16, 32, 64, 128)  # anchor size in pixels
+    RPN_ANCHOR_SCALES = (16, 32, 64, 128, 256)  # anchor size in pixels
     
     # ROIs kept after non-maximum supression (training and inference)
     POST_NMS_ROIS_TRAINING = 1000
     POST_NMS_ROIS_INFERENCE = 2000
 
     # Non-max suppression threshold to filter RPN proposals.
-    # You can increase this during training to generate more propsals.
+    # You can increase this during training to generate more proposals.
     RPN_NMS_THRESHOLD = 0.9
 
     # How many anchors per image to use for RPN training
-    RPN_TRAIN_ANCHORS_PER_IMAGE = 128
+    RPN_TRAIN_ANCHORS_PER_IMAGE = 256
     
     # Reduce training ROIs per image because the images are small and have
     # few objects. Aim to allow ROI sampling to pick 33% positive ROIs.
-    TRAIN_ROIS_PER_IMAGE = 128
+    TRAIN_ROIS_PER_IMAGE = 256
 
     # Use a small epoch since the data is simple
     STEPS_PER_EPOCH = 500
 
     # use small validation steps since the epoch is small
-    VALIDATION_STEPS = 5
+    VALIDATION_STEPS = 25
 
     # Backbone network architecture
     # Supported values are: resnet50, resnet101
@@ -62,7 +62,7 @@ class MalariaInferenceConfig(MalariaConfig):
     # Set batch size to 1 to run one image at a time
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
-    RPN_ANCHOR_SCALES = (8, 16, 32, 64, 128)  # anchor size in pixels
+    RPN_ANCHOR_SCALES = (16, 32, 64, 128, 256)  # anchor size in pixels
     # Non-max suppression threshold to filter RPN proposals.
     # You can increase this during training to generate more propsals.
     RPN_NMS_THRESHOLD = 0.7
