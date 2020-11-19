@@ -29,7 +29,7 @@ end
 # unset irrelevant variables
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/Users/mwornow/Dropbox/Stanford/Classes/CS 279 (Structure of Biomolecules and Cells)/Project/myvenv"
+set -gx VIRTUAL_ENV "/lfs/1/mwornow/cs279-final-project/myvenv"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH

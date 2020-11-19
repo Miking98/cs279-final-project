@@ -1,6 +1,4 @@
-#!/bin/sh
-'''exec' "/Users/mwornow/Dropbox/Stanford/Classes/CS 279 (Structure of Biomolecules and Cells)/Project/myvenv/bin/python3.7" "$0" "$@"
-' '''
+#!/lfs/1/mwornow/cs279-final-project/myvenv/bin/python3.7
 # -*- coding: utf-8 -*-
 import re
 import sys

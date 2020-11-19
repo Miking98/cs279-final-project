@@ -37,7 +37,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="/Users/mwornow/Dropbox/Stanford/Classes/CS 279 (Structure of Biomolecules and Cells)/Project/myvenv"
+VIRTUAL_ENV="/lfs/1/mwornow/cs279-final-project/myvenv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
