@@ -95,14 +95,14 @@ def train(model, dataset_dir):
                 learning_rate=config.LEARNING_RATE,
                 epochs=5, # Usually 20
                 layers='heads',
-                use_multiprocessing = False)
+                use_multiprocessing = True)
 
     print("Train all layers")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
                 epochs=10,
                 layers='all',
-                use_multiprocessing = False)
+                use_multiprocessing = True)
 
 
 
