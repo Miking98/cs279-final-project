@@ -86,19 +86,22 @@ def train(model, dataset_dir):
     dataset_val = MalariaDataset()
     dataset_val.load_dataset(dataset_dir, is_val = True)
     dataset_val.prepare()
+
+    dataset_val.load_mask(0, visualization = True)
+    exit()
     # If starting from imagenet, train heads only for a bit
     # since they have random weights
     print("Train network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=10, # Usually 20
+                epochs=5, # Usually 20
                 layers='heads',
                 use_multiprocessing = False)
 
     print("Train all layers")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=25,
+                epochs=10,
                 layers='all',
                 use_multiprocessing = False)
 

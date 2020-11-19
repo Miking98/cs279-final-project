@@ -198,5 +198,5 @@ def explore_data():
             plt.xlabel("Number of Cells in Cell Cluster")
             plt.show()
             
-# display_image(['5f491efd-a21c-4a80-aaba-70b8876238ac'])
-explore_data()
+display_image(['10be6380-cbbb-4886-8b9e-ff56b1710576'])
+# explore_data()

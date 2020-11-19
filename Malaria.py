@@ -1,8 +1,11 @@
 import os, json
 from Mask_RCNN.mrcnn import utils
+from Mask_RCNN.mrcnn import visualize
 from Mask_RCNN.mrcnn.config import Config
 import numpy as np
 import skimage.io
+import matplotlib.pyplot as plt
+
 
 class MalariaConfig(Config):
     """
@@ -15,7 +18,7 @@ class MalariaConfig(Config):
     # Train on 1 GPU and 8 images per GPU. We can put multiple images on each
     # GPU because the images are small. Batch size is 8 (GPUs * images/GPU).
     GPU_COUNT = 1
-    IMAGES_PER_GPU = 2
+    IMAGES_PER_GPU = 8
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 7
@@ -24,24 +27,21 @@ class MalariaConfig(Config):
     # the large side, and that determines the image shape.
     IMAGE_MIN_DIM = 512
     IMAGE_MAX_DIM = 512
+    MAX_GT_INSTANCES = 200
 
     # Use smaller anchors because our image and objects are small
-    RPN_ANCHOR_SCALES = (8, 16, 32, 64, 128)  # anchor size in pixels
+    RPN_ANCHOR_SCALES = (8, 16, 32, 64)  # anchor size in pixels
     
     # ROIs kept after non-maximum supression (training and inference)
     POST_NMS_ROIS_TRAINING = 1000
     POST_NMS_ROIS_INFERENCE = 2000
 
-    # Non-max suppression threshold to filter RPN proposals.
-    # You can increase this during training to generate more propsals.
-    RPN_NMS_THRESHOLD = 0.9
-
     # How many anchors per image to use for RPN training
-    RPN_TRAIN_ANCHORS_PER_IMAGE = 64
+    RPN_TRAIN_ANCHORS_PER_IMAGE = 128
     
     # Reduce training ROIs per image because the images are small and have
     # few objects. Aim to allow ROI sampling to pick 33% positive ROIs.
-    TRAIN_ROIS_PER_IMAGE = 32
+    TRAIN_ROIS_PER_IMAGE = 128
 
     # Use a small epoch since the data is simple
     STEPS_PER_EPOCH = 500
@@ -51,29 +51,17 @@ class MalariaConfig(Config):
 
     # Backbone network architecture
     # Supported values are: resnet50, resnet101
-    BACKBONE = "resnet50"
+    BACKBONE = "resnet101"
 
-    # Input image resizing
-    # Random crops of size 512x512
-    IMAGE_RESIZE_MODE = "crop"
-    IMAGE_MIN_DIM = 512
-    IMAGE_MAX_DIM = 512
-    IMAGE_MIN_SCALE = 2.0
-
-    # If enabled, resizes instance masks to a smaller size to reduce
-    # memory load. Recommended when using high-resolution images.
-    USE_MINI_MASK = True
-    MINI_MASK_SHAPE = (56, 56)  # (height, width) of the mini-mask
 
 class MalariaInferenceConfig(MalariaConfig):
     # Set batch size to 1 to run one image at a time
+    NAME = "malaria"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
-    # Don't resize imager for inferencing
-    IMAGE_RESIZE_MODE = "pad64"
-    # Non-max suppression threshold to filter RPN proposals.
-    # You can increase this during training to generate more propsals.
-    RPN_NMS_THRESHOLD = 0.7
+    NUM_CLASSES = 1 + 7
+    RPN_ANCHOR_SCALES = (8, 16, 32, 64)  # anchor size in pixels
+    BACKBONE = "resnet101"
 
 class MalariaDataset(utils.Dataset):
     CLASSES = {
@@ -98,6 +86,7 @@ class MalariaDataset(utils.Dataset):
         # Add classes
         for class_name in self.CLASSES.keys():
             self.add_class('malaria', self.CLASSES[class_name], class_name)
+
         # Add data
         file_name = "training.json" if is_train or is_val else 'test.json'
         with open(os.path.join(dataset_dir, file_name)) as json_file:
@@ -123,7 +112,7 @@ class MalariaDataset(utils.Dataset):
             print("LOAD IMAGE: ", image_id)
         return super().load_image(image_idx)
 
-    def load_mask(self, image_idx):
+    def load_mask(self, image_idx, visualization = False):
         """Generate instance masks for an image.
        Returns:
         masks: A bool array of shape [height, width, instance count] with
@@ -133,31 +122,31 @@ class MalariaDataset(utils.Dataset):
         image_id = self.image_info[image_idx]['id']
         masks = None
         class_ids = []
+        class_names = []
+        boxes = []
         # Construct masks from bounding boxes
         for img in self.images:
             # If found the right Image in the JSON file...
             if image_id == self.get_image_id_from_pathname_entry_in_json(img['image']['pathname']):
-                if 1:
-                    print("FOUND MASK FOR: ", image_id)
                 img_contents = skimage.io.imread(os.path.join(self.dataset_dir, img['image']['pathname'][1:])) # NOTE: Need to get rid of leading slash
                 # For each bounding box in 'objects'....
-                print(img_contents.shape, len(img['objects']), img['image'])
                 masks = np.zeros((img_contents.shape[0], img_contents.shape[1], len(img['objects'])))
                 for o_idx, o in enumerate(img['objects']):
                     label = o['category']
                     min_y, min_x = o['bounding_box']['minimum']['r'], o['bounding_box']['minimum']['c']
                     max_y, max_x = o['bounding_box']['maximum']['r'], o['bounding_box']['maximum']['c']
                     masks[min_y:max_y, min_x:max_x, o_idx] = 1
+                    class_names.append(label)
+                    boxes.append((min_y, min_x, max_y, max_x))
                     class_ids.append(self.CLASSES[label])
                 break
-        print(masks.shape, class_ids)
-        exit()
+        if visualization:
+            fig, ax = plt.subplots(1, figsize = (10,10))
+            visualize.display_instances(self.load_image(image_idx), np.array(boxes), masks, np.array(class_ids), class_names, ax = ax)
+            fig.savefig('Mask for Image: ' + image_id + '.png', bbox_inches='tight')
         return masks, np.array(class_ids)
 
     def image_reference(self, image_idx):
         """Return the path of the image."""
         info = self.image_info[image_idx]
-        if info["source"] == "malaria":
-            return info["path"]
-        else:
-            super(self.__class__, self).image_reference(image_id)
+        return info["path"]
