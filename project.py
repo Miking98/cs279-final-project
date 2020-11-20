@@ -7,6 +7,7 @@ import matplotlib.patches as patches
 from imgaug import augmenters as iaa
 import os
 import datetime
+import tensorflow as tf
 
 # Mask R-CNN
 from Mask_RCNN.mrcnn import utils
@@ -57,18 +58,28 @@ def inference(model, dataset_dir):
     dataset.prepare()
     # Load over images
     submission = []
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize = (10,10))
     for image_id in dataset.image_ids:
         # Load image and run inference
         image = dataset.load_image(image_id)
+        raw_image_id = dataset.image_info[image_id]["id"]
         # Detect objects
         r = model.detect([image], verbose=0)[0]
-        # Save image with masks
+        # Save raw image
+        boxes, masks, class_ids, class_names = dataset.load_masks_and_boxes(image_id)
+        visualize.display_instances(
+            image, boxes, masks, class_ids, class_names,
+            show_bbox=True, show_mask=False,
+            title="Ground Truth", ax = ax1)
+        # Save prediction
         visualize.display_instances(
             image, r['rois'], r['masks'], r['class_ids'],
             dataset.class_names, r['scores'],
             show_bbox=True, show_mask=False,
-            title="Predictions")
-        plt.savefig("{}/{}.png".format(submit_dir, dataset.image_info[image_id]["id"]))
+            title="Predictions", ax = ax2)
+        plt.title("Image: " + str(raw_image_id))
+        fig.savefig("{}/{}.png".format(submit_dir, raw_image_id), bbox_inches='tight')
+        plt.cla()
     print("---- DONE DETECTING ----")
 
 def train(model, dataset_dir):
@@ -104,19 +115,31 @@ def train(model, dataset_dir):
                 layers='all',
                 use_multiprocessing = True)
 
-
-
+def evaluate(model, dataset_dir):
+    for image_id in dataset.image_ids:
+        # Load image and run evaluation
+        image = dataset.load_image(image_id)
+        raw_image_id = dataset.image_info[image_id]["id"]
+        # Run model
+        r = model.detect([image], verbose=0)[0]
+        pred_boxes, pred_masks, pred_class_ids, pred_scores = r['rois'], r['masks'], r['class_ids'], r['scores']
+        # Groud truths
+        gt_boxes, gt_masks, gt_class_ids, gt_class_names = dataset.load_masks_and_boxes(image_id)
+        # Run evaluation metrics
+        __, eval_data = compute_ap_range(gt_boxes, gt_class_ids, gt_masks,
+                        pred_boxes, pred_class_ids, pred_scores, pred_masks,
+                        iou_thresholds=None, verbose=1)
+        aps = [ e[0] for e in eval_data ]
+        precisions = [ e[1] for e in eval_data ]
+        recalls = [ e[2] for e in eval_data ]
+        overlaps = [ e[3] for e in eval_data ]
 
 if __name__ == '__main__':
     import argparse
 
-    '''
-    TRAIN:
-        python3 project.py train --dataset /Users/mwornow/Desktop/data --weights coco
-    TEST:
-        
-    '''
 
+    gpu_options = tf.compat.v1.GPUOptions(allow_growth=True)
+    session = tf.compat.v1.InteractiveSession(config=tf.compat.v1.ConfigProto(gpu_options=gpu_options))
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Malaria Dataset Classification')
     parser.add_argument("command",
@@ -179,11 +202,13 @@ if __name__ == '__main__':
     else:
         model.load_weights(weights_path, by_name=True)
 
-    # Train or evaluate
+    # Train or inference or evaluate
     if args.command == "train":
         train(model, args.dataset)
     elif args.command == "inference":
         inference(model, args.dataset)
+    elif args.command == "evaluate":
+        evaluate(model, args.dataset)
     else:
         print("'{}' is not recognized. "
-              "Use 'train' or 'inference'".format(args.command))
+              "Use 'train' or 'inference' or 'evaluate'".format(args.command))

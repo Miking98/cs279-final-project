@@ -19,6 +19,7 @@ class MalariaConfig(Config):
     # GPU because the images are small. Batch size is 8 (GPUs * images/GPU).
     GPU_COUNT = 1
     IMAGES_PER_GPU = 8
+    BATCH_SIZE = 8
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 7
@@ -93,6 +94,7 @@ class MalariaDataset(utils.Dataset):
 
         # Add data
         file_name = "training.json" if is_train or is_val else 'test.json'
+        print(file_name)
         with open(os.path.join(dataset_dir, file_name)) as json_file:
             self.images = json.load(json_file)
             for img_idx, img in enumerate(self.images):
@@ -104,9 +106,10 @@ class MalariaDataset(utils.Dataset):
                 img_path = img['image']['pathname']
                 img_id = self.get_image_id_from_pathname_entry_in_json(img_path)
                 # NOTE: Need to adjust image path so that it doesn't have a leading "/" (otherwise os.path.join will be confused)
-                if False:
+                if True:
                     print("ADD IMAGE", img_id, img_path)
                 self.add_image('malaria', image_id = img_id, path = os.path.join(dataset_dir, img_path[1:]))
+                if img_idx > 20: break
 
     def load_image(self, image_idx):
         """Load image.
@@ -116,6 +119,35 @@ class MalariaDataset(utils.Dataset):
             print("LOAD IMAGE: ", image_id)
         return super().load_image(image_idx)
 
+    def load_masks_and_boxes(self, image_idx):
+        """Generate masks/boxes needed for visualization
+       Returns:
+        masks: A bool array of shape [height, width, instance count] with
+            one mask per instance.
+        class_ids: a 1D array of class IDs of the instance masks.
+        """
+        image_id = self.image_info[image_idx]['id']
+        masks = None
+        class_ids = []
+        class_names = []
+        boxes = []
+        # Construct masks from bounding boxes
+        for img in self.images:
+            # If found the right Image in the JSON file...
+            if image_id == self.get_image_id_from_pathname_entry_in_json(img['image']['pathname']):
+                # For each bounding box in 'objects'....
+                masks = np.zeros((img['image']['shape']['r'], img['image']['shape']['c'], len(img['objects'])))
+                for o_idx, o in enumerate(img['objects']):
+                    label = o['category']
+                    min_y, min_x = o['bounding_box']['minimum']['r'], o['bounding_box']['minimum']['c']
+                    max_y, max_x = o['bounding_box']['maximum']['r'], o['bounding_box']['maximum']['c']
+                    masks[min_y:max_y, min_x:max_x, o_idx] = 1
+                    class_names.append(label)
+                    boxes.append((min_y, min_x, max_y, max_x))
+                    class_ids.append(self.CLASSES[label])
+                break
+        return np.array(boxes), masks, np.array(class_ids), class_names
+    
     def load_mask(self, image_idx, visualization = False):
         """Generate instance masks for an image.
        Returns:
@@ -132,9 +164,8 @@ class MalariaDataset(utils.Dataset):
         for img in self.images:
             # If found the right Image in the JSON file...
             if image_id == self.get_image_id_from_pathname_entry_in_json(img['image']['pathname']):
-                img_contents = skimage.io.imread(os.path.join(self.dataset_dir, img['image']['pathname'][1:])) # NOTE: Need to get rid of leading slash
                 # For each bounding box in 'objects'....
-                masks = np.zeros((img_contents.shape[0], img_contents.shape[1], len(img['objects'])))
+                masks = np.zeros((img['image']['shape']['r'], img['image']['shape']['c'], len(img['objects'])))
                 for o_idx, o in enumerate(img['objects']):
                     label = o['category']
                     min_y, min_x = o['bounding_box']['minimum']['r'], o['bounding_box']['minimum']['c']

@@ -273,11 +273,14 @@ class Dataset(object):
             "name": class_name,
         })
 
-    def add_image(self, source, image_id, path, **kwargs):
+    def add_image(self, source, image_id, path, image = None, masks = None, class_ids = None, **kwargs):
         image_info = {
             "id": image_id,
             "source": source,
             "path": path,
+            'image' : image,
+            'masks' : masks,
+            'class_ids' : class_ids,
         }
         image_info.update(kwargs)
         self.image_info.append(image_info)
@@ -760,6 +763,7 @@ def compute_ap_range(gt_box, gt_class_id, gt_mask,
     
     # Compute AP over range of IoU thresholds
     AP = []
+    full_data = []
     for iou_threshold in iou_thresholds:
         ap, precisions, recalls, overlaps =\
             compute_ap(gt_box, gt_class_id, gt_mask,
@@ -768,11 +772,12 @@ def compute_ap_range(gt_box, gt_class_id, gt_mask,
         if verbose:
             print("AP @{:.2f}:\t {:.3f}".format(iou_threshold, ap))
         AP.append(ap)
+        full_data.append((ap, precisions, recalls, overlaps))
     AP = np.array(AP).mean()
     if verbose:
         print("AP @{:.2f}-{:.2f}:\t {:.3f}".format(
             iou_thresholds[0], iou_thresholds[-1], AP))
-    return AP
+    return AP, full_data
 
 
 def compute_recall(pred_boxes, gt_boxes, iou):
