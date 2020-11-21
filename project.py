@@ -30,6 +30,10 @@ DEFAULT_LOGS_DIR = os.path.join(PROJECT_DIR, "logs")
 # Save submission files here
 RESULTS_DIR = os.path.join(PROJECT_DIR, "results/")
 
+# Evaluation directory
+# Save submission files here
+EVAL_DIR = os.path.join(PROJECT_DIR, "evals/")
+
 # For labeling boundary boxes in plots
 CATEGORY_COLORS = { 
     'red blood cell' : 'red', 
@@ -77,8 +81,10 @@ def inference(model, dataset_dir):
             dataset.class_names, r['scores'],
             show_bbox=True, show_mask=False,
             title="Predictions", ax = ax2)
-        plt.title("Image: " + str(raw_image_id))
+        fig.suptitle("Image: " + str(raw_image_id))
         fig.savefig("{}/{}.png".format(submit_dir, raw_image_id), bbox_inches='tight')
+        ax1.clear()
+        ax2.clear()
         plt.cla()
     print("---- DONE DETECTING ----")
 
@@ -115,7 +121,24 @@ def train(model, dataset_dir):
                 layers='all',
                 use_multiprocessing = True)
 
-def evaluate(model, dataset_dir):
+def evaluate(model, dataset_dir, eval_target):
+    print("Running on {}".format(dataset_dir))
+
+    # Create directory
+    if not os.path.exists(EVAL_DIR):
+        os.makedirs(EVAL_DIR)
+    submit_dir = "eval_{:%Y%m%dT%H%M%S}".format(datetime.datetime.now())
+    submit_dir = os.path.join(EVAL_DIR, submit_dir)
+    os.makedirs(submit_dir)
+
+    # Read dataset
+    dataset = MalariaDataset()
+    dataset.load_dataset(dataset_dir, is_train = eval_target == "train", is_val = eval_target == "val", is_test = eval_target == "test")
+    dataset.prepare()
+
+    fig, ax = plt.subplots(1, figsize = (10,10))
+    
+    APs = []
     for image_id in dataset.image_ids:
         # Load image and run evaluation
         image = dataset.load_image(image_id)
@@ -126,13 +149,27 @@ def evaluate(model, dataset_dir):
         # Groud truths
         gt_boxes, gt_masks, gt_class_ids, gt_class_names = dataset.load_masks_and_boxes(image_id)
         # Run evaluation metrics
-        __, eval_data = compute_ap_range(gt_boxes, gt_class_ids, gt_masks,
-                        pred_boxes, pred_class_ids, pred_scores, pred_masks,
-                        iou_thresholds=None, verbose=1)
-        aps = [ e[0] for e in eval_data ]
-        precisions = [ e[1] for e in eval_data ]
-        recalls = [ e[2] for e in eval_data ]
-        overlaps = [ e[3] for e in eval_data ]
+        if False:
+            AP, iou_thresholds, eval_data = utils.compute_ap_range(gt_boxes, gt_class_ids, gt_masks,
+                            pred_boxes, pred_class_ids, pred_scores, pred_masks,
+                            iou_thresholds=None, verbose=1)
+            aps = [ e[0] for e in eval_data ]
+            precisions = [ e[1] for e in eval_data ]
+            recalls = [ e[2] for e in eval_data ]
+            overlaps = [ e[3] for e in eval_data ]
+            ax.plot(iou_thresholds, aps)
+            plt.title("Image: " + str(raw_image_id))
+            plt.xlabel("IOU")
+            plt.ylabel("AP")
+            fig.savefig("{}/{}.png".format(submit_dir, raw_image_id), bbox_inches='tight')
+            plt.cla()
+        else:
+            AP, _, _, _ = utils.compute_ap(gt_boxes, gt_class_ids, gt_masks,
+               pred_boxes, pred_class_ids, pred_scores, pred_masks,
+               iou_threshold=0.5)
+        APs.append(AP)
+    mAP = np.mean(APs)
+    print("===> mAP for " + eval_target + ": " + str(mAP))
 
 if __name__ == '__main__':
     import argparse
@@ -155,6 +192,9 @@ if __name__ == '__main__':
                         default=DEFAULT_LOGS_DIR,
                         metavar="/path/to/logs/",
                         help='Logs and checkpoints directory (default=logs/)')
+    parser.add_argument('--eval_target', required=False,
+                        default="train",
+                        help='For evaluation keyword')
     args = parser.parse_args()
 
     # Validate arguments
@@ -207,8 +247,11 @@ if __name__ == '__main__':
         train(model, args.dataset)
     elif args.command == "inference":
         inference(model, args.dataset)
-    elif args.command == "evaluate":
-        evaluate(model, args.dataset)
+    elif args.command == "evaluation":
+        if not args.eval_target:
+            print("Please set --eval_target flag!")
+        else:
+            evaluate(model, args.dataset, args.eval_target)
     else:
         print("'{}' is not recognized. "
               "Use 'train' or 'inference' or 'evaluate'".format(args.command))

@@ -777,7 +777,7 @@ def compute_ap_range(gt_box, gt_class_id, gt_mask,
     if verbose:
         print("AP @{:.2f}-{:.2f}:\t {:.3f}".format(
             iou_thresholds[0], iou_thresholds[-1], AP))
-    return AP, full_data
+    return AP, iou_thresholds, full_data
 
 
 def compute_recall(pred_boxes, gt_boxes, iou):

@@ -109,7 +109,6 @@ class MalariaDataset(utils.Dataset):
                 if True:
                     print("ADD IMAGE", img_id, img_path)
                 self.add_image('malaria', image_id = img_id, path = os.path.join(dataset_dir, img_path[1:]))
-                if img_idx > 20: break
 
     def load_image(self, image_idx):
         """Load image.
